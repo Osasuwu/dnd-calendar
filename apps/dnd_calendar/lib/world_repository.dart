@@ -49,6 +49,17 @@ class WorldRepository {
     return doc.id;
   }
 
+  /// Replace the calendar config of one world. Owner-only — Firestore rules
+  /// enforce. The `currentDate` field is part of [calendar].
+  Future<void> updateCalendar(
+    String worldId,
+    CalendarConfigData calendar,
+  ) async {
+    await _worlds.doc(worldId).update({
+      'calendar': calendar.toJson(),
+    });
+  }
+
   static const _joinCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   static final _rng = Random.secure();
 
