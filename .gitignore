@@ -39,3 +39,12 @@ coverage/
 *.keystore
 *.jks
 key.properties
+
+# Stray (npm tooling not used in this repo)
+node_modules/
+package.json
+package-lock.json
+
+# Firebase CLI scratch
+firebase.json
+.firebaserc
