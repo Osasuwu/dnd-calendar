@@ -45,6 +45,6 @@ node_modules/
 package.json
 package-lock.json
 
-# Firebase CLI scratch
-firebase.json
-.firebaserc
+# Firebase CLI scratch — flutterfire writes per-app firebase.json with
+# project + app IDs; root-level firebase.json is committed for rules deploy.
+apps/*/firebase.json

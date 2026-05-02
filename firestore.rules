@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Firestore security rules for dnd-calendar.
+//
+// MVP shape — kept loose where the membership system isn't built yet (S1).
+// S4 tightens the per-world read gate to "must be member or owner".
+// S3/S5/S6 add per-subcollection rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(worldId) {
+      return signedIn()
+          && exists(/databases/$(database)/documents/worlds/$(worldId))
+          && get(/databases/$(database)/documents/worlds/$(worldId)).data.ownerUid == request.auth.uid;
+    }
+
+    match /worlds/{worldId} {
+      // Read: any authed user (S4 will narrow to members + owner).
+      allow read: if signedIn();
+
+      // Create: only as your own world; ownerUid must match auth.uid.
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      // Update / delete: only owner; ownerUid is immutable.
+      allow update: if isOwner(worldId)
+        && request.resource.data.ownerUid == resource.data.ownerUid;
+      allow delete: if isOwner(worldId);
+
+      // Subcollections — open placeholders. Real rules land in S3/S4/S5/S6.
+      match /{document=**} {
+        allow read, write: if signedIn();
+      }
+    }
+  }
+}
