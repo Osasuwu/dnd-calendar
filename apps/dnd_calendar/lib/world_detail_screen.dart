@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_providers.dart';
 import 'calendar_config_edit_screen.dart';
+import 'events_section.dart';
+import 'models/world.dart';
 import 'world_providers.dart';
 
 class WorldDetailScreen extends ConsumerWidget {
@@ -17,81 +19,112 @@ class WorldDetailScreen extends ConsumerWidget {
     final world = ref.watch(worldProvider(worldId));
     final me = ref.watch(authStateChangesProvider).valueOrNull;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('World')),
-      body: world.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (w) {
-          if (w == null) {
-            return const Center(child: Text('World not found.'));
-          }
-          final isOwner = me?.uid == w.ownerUid;
-          final cal = w.calendar.toEngine();
-          final today = w.calendar.currentDate.toEngine();
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(w.name, style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 8),
-              if (isOwner)
-                _OwnerJoinCode(joinCode: w.joinCode)
-              else
-                Text('Role: player', style: Theme.of(context).textTheme.bodySmall),
-              const Divider(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Calendar',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  if (isOwner)
-                    TextButton.icon(
-                      onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CalendarConfigEditScreen(
-                            worldId: w.id,
-                            initial: w.calendar,
-                          ),
-                        ),
-                      ),
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit'),
-                    ),
+    return world.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Scaffold(
+        body: Center(child: Text('Error: $e')),
+      ),
+      data: (w) {
+        if (w == null) {
+          return const Scaffold(
+            body: Center(child: Text('World not found.')),
+          );
+        }
+        final isOwner = me?.uid == w.ownerUid;
+        return DefaultTabController(
+          length: 2,
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(w.name),
+              bottom: const TabBar(
+                tabs: [
+                  Tab(icon: Icon(Icons.castle), text: 'Overview'),
+                  Tab(icon: Icon(Icons.event), text: 'Events'),
                 ],
               ),
-              const SizedBox(height: 8),
-              _kv(context, 'Today', engine.formatDate(today, cal)),
-              _kv(context, 'Week length', '${cal.daysPerWeek} days'),
-              _kv(
-                context,
-                'Year length',
-                '${cal.daysInYear(today.year)} days '
-                    '(${cal.months.length} months)',
+            ),
+            body: TabBarView(
+              children: [
+                _OverviewTab(world: w, isOwner: isOwner),
+                EventsSection(worldId: w.id, calendar: w.calendar),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _OverviewTab extends StatelessWidget {
+  const _OverviewTab({required this.world, required this.isOwner});
+
+  final World world;
+  final bool isOwner;
+
+  @override
+  Widget build(BuildContext context) {
+    final cal = world.calendar.toEngine();
+    final today = world.calendar.currentDate.toEngine();
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (isOwner)
+          _OwnerJoinCode(joinCode: world.joinCode)
+        else
+          Text('Role: player', style: Theme.of(context).textTheme.bodySmall),
+        const Divider(height: 32),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Calendar',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              _kv(context, 'Epoch', cal.epochName),
-              _kv(context, 'Moons', cal.moons.map((m) => m.name).join(', ')),
-              if (cal.leapRule != null)
-                _kv(
-                  context,
-                  'Leap rule',
-                  'Every ${cal.leapRule!.everyNYears} years +1 day',
-                )
-              else
-                _kv(context, 'Leap rule', 'none'),
-              const SizedBox(height: 32),
-              const Divider(),
-              const Text(
-                'Events, characters, and quest registration land in later '
-                'slices.',
-                style: TextStyle(fontSize: 12),
+            ),
+            if (isOwner)
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CalendarConfigEditScreen(
+                      worldId: world.id,
+                      initial: world.calendar,
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.edit),
+                label: const Text('Edit'),
               ),
-            ],
-          );
-        },
-      ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _kv(context, 'Today', engine.formatDate(today, cal)),
+        _kv(context, 'Week length', '${cal.daysPerWeek} days'),
+        _kv(
+          context,
+          'Year length',
+          '${cal.daysInYear(today.year)} days '
+              '(${cal.months.length} months)',
+        ),
+        _kv(context, 'Epoch', cal.epochName),
+        _kv(context, 'Moons', cal.moons.map((m) => m.name).join(', ')),
+        if (cal.leapRule != null)
+          _kv(
+            context,
+            'Leap rule',
+            'Every ${cal.leapRule!.everyNYears} years +1 day',
+          )
+        else
+          _kv(context, 'Leap rule', 'none'),
+        const SizedBox(height: 32),
+        const Divider(),
+        const Text(
+          'Characters and quest registration land in later slices.',
+          style: TextStyle(fontSize: 12),
+        ),
+      ],
     );
   }
 
