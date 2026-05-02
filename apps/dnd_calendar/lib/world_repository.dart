@@ -131,6 +131,17 @@ class WorldRepository {
     });
   }
 
+  /// Replace just `calendar.currentDate` — used by the DM "advance date"
+  /// quick controls on the world overview.
+  Future<void> setCurrentDate(
+    String worldId,
+    WorldDateData currentDate,
+  ) async {
+    await _worlds.doc(worldId).update({
+      'calendar.currentDate': currentDate.toJson(),
+    });
+  }
+
   static const _joinCodeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   static final _rng = Random.secure();
 

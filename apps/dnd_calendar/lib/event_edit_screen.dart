@@ -31,6 +31,7 @@ class _EventEditScreenState extends ConsumerState<EventEditScreen> {
   final _descCtl = TextEditingController();
   final _capacityCtl = TextEditingController();
   late WorldDateData _startDate;
+  WorldDateData? _endDate;
   WorldDateData? _deadline;
   bool _busy = false;
   String? _error;
@@ -46,9 +47,11 @@ class _EventEditScreenState extends ConsumerState<EventEditScreen> {
       _descCtl.text = e.description;
       _capacityCtl.text = e.capacity?.toString() ?? '';
       _startDate = e.startDate;
+      _endDate = e.endDate == e.startDate ? null : e.endDate;
       _deadline = e.registrationDeadline == e.startDate ? null : e.registrationDeadline;
     } else {
       _startDate = widget.calendar.currentDate;
+      _endDate = null;
       _deadline = null;
     }
   }
@@ -98,6 +101,7 @@ class _EventEditScreenState extends ConsumerState<EventEditScreen> {
         title: title,
         description: _descCtl.text.trim(),
         startDate: _startDate,
+        endDate: _endDate,
         registrationDeadline: _deadline ?? _startDate,
         capacity: capacity,
       );
@@ -167,7 +171,24 @@ class _EventEditScreenState extends ConsumerState<EventEditScreen> {
             initial: _startDate,
             onChanged: (d) => setState(() => _startDate = d),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Multi-day event'),
+            value: _endDate != null,
+            onChanged: (v) => setState(() {
+              _endDate = v ? _startDate : null;
+            }),
+          ),
+          if (_endDate != null) ...[
+            WorldDatePicker(
+              label: 'End date',
+              calendar: widget.calendar,
+              initial: _endDate ?? _startDate,
+              onChanged: (d) => setState(() => _endDate = d),
+            ),
+            const SizedBox(height: 16),
+          ],
           WorldDatePicker(
             label: 'Registration deadline (default = start date)',
             calendar: widget.calendar,

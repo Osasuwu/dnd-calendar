@@ -8,6 +8,8 @@ import 'calendar_config_edit_screen.dart';
 import 'characters_section.dart';
 import 'events_section.dart';
 import 'models/world.dart';
+import 'moon_strip.dart';
+import 'world_date_picker.dart';
 import 'world_providers.dart';
 
 class WorldDetailScreen extends ConsumerWidget {
@@ -61,14 +63,14 @@ class WorldDetailScreen extends ConsumerWidget {
   }
 }
 
-class _OverviewTab extends StatelessWidget {
+class _OverviewTab extends ConsumerWidget {
   const _OverviewTab({required this.world, required this.isOwner});
 
   final World world;
   final bool isOwner;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cal = world.calendar.toEngine();
     final today = world.calendar.currentDate.toEngine();
     return ListView(
@@ -79,6 +81,44 @@ class _OverviewTab extends StatelessWidget {
         else
           Text('Role: player', style: Theme.of(context).textTheme.bodySmall),
         const Divider(height: 32),
+        // Today + moons + advance controls
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Today', style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 4),
+                Text(
+                  engine.formatDate(today, cal),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                MoonStrip(calendar: world.calendar, date: world.calendar.currentDate),
+                if (isOwner) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.add),
+                        label: const Text('+1 day'),
+                        onPressed: () => _advanceOneDay(context, ref),
+                      ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.calendar_today),
+                        label: const Text('Set date…'),
+                        onPressed: () => _pickDate(context, ref),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
@@ -103,7 +143,6 @@ class _OverviewTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-        _kv(context, 'Today', engine.formatDate(today, cal)),
         _kv(context, 'Week length', '${cal.daysPerWeek} days'),
         _kv(
           context,
@@ -112,7 +151,11 @@ class _OverviewTab extends StatelessWidget {
               '(${cal.months.length} months)',
         ),
         _kv(context, 'Epoch', cal.epochName),
-        _kv(context, 'Moons', cal.moons.map((m) => m.name).join(', ')),
+        _kv(
+          context,
+          'Moons',
+          cal.moons.isEmpty ? 'none' : cal.moons.map((m) => m.name).join(', '),
+        ),
         if (cal.leapRule != null)
           _kv(
             context,
@@ -121,14 +164,62 @@ class _OverviewTab extends StatelessWidget {
           )
         else
           _kv(context, 'Leap rule', 'none'),
-        const SizedBox(height: 32),
-        const Divider(),
-        const Text(
-          'Characters and quest registration land in later slices.',
-          style: TextStyle(fontSize: 12),
-        ),
       ],
     );
+  }
+
+  Future<void> _advanceOneDay(BuildContext context, WidgetRef ref) async {
+    final cal = world.calendar.toEngine();
+    final next = engine.addDays(world.calendar.currentDate.toEngine(), 1, cal);
+    await _writeDate(context, ref, WorldDateData.fromEngine(next));
+  }
+
+  Future<void> _pickDate(BuildContext context, WidgetRef ref) async {
+    var picked = world.calendar.currentDate;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Set current date'),
+        content: SizedBox(
+          width: 360,
+          child: WorldDatePicker(
+            calendar: world.calendar,
+            initial: picked,
+            onChanged: (d) => picked = d,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Set'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    await _writeDate(context, ref, picked);
+  }
+
+  Future<void> _writeDate(
+    BuildContext context,
+    WidgetRef ref,
+    WorldDateData newDate,
+  ) async {
+    try {
+      await ref
+          .read(worldRepositoryProvider)
+          .setCurrentDate(world.id, newDate);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed: $e')),
+        );
+      }
+    }
   }
 
   Widget _kv(BuildContext context, String k, String v) => Padding(

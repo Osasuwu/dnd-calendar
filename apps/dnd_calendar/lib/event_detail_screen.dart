@@ -10,6 +10,7 @@ import 'models/character.dart';
 import 'models/event.dart';
 import 'models/registration.dart';
 import 'models/world.dart';
+import 'moon_strip.dart';
 import 'registration_providers.dart';
 import 'registration_repository.dart';
 import 'world_providers.dart';
@@ -75,6 +76,11 @@ class _Body extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = world.toEngine();
     final start = engine.formatDate(event.startDate.toEngine(), c);
+    final isMultiDay =
+        event.endDate != null && event.endDate != event.startDate;
+    final endStr = isMultiDay
+        ? engine.formatDate(event.endDate!.toEngine(), c)
+        : null;
     final regsAsync = ref.watch(
       registrationsProvider((worldId: event.worldId, eventId: event.id)),
     );
@@ -106,8 +112,11 @@ class _Body extends ConsumerWidget {
             _StatusBadge(status: event.status),
           ],
         ),
+        const SizedBox(height: 8),
+        MoonStrip(calendar: world, date: event.startDate),
         const SizedBox(height: 12),
-        _kv(context, 'When', start),
+        _kv(context, 'Starts', start),
+        if (endStr != null) _kv(context, 'Ends', endStr),
         if (event.registrationDeadline != event.startDate)
           _kv(
             context,
