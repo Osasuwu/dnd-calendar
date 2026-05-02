@@ -227,6 +227,10 @@ class _EventTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final start = engine.formatDate(event.startDate.toEngine(), calendar);
     final cancelled = event.status == EventStatus.cancelled;
+    final hasEnd = event.endDate != null && event.endDate != event.startDate;
+    final subtitle = hasEnd
+        ? '$start  →  ${engine.formatDate(event.endDate!.toEngine(), calendar)}'
+        : start;
     return ListTile(
       leading: Icon(
         cancelled ? Icons.cancel_outlined : Icons.event,
@@ -239,7 +243,7 @@ class _EventTile extends StatelessWidget {
           color: dim ? Theme.of(context).hintColor : null,
         ),
       ),
-      subtitle: Text(start),
+      subtitle: Text(subtitle),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => EventDetailScreen(
@@ -280,12 +284,27 @@ class _MonthView extends StatelessWidget {
       engine.WorldDate(year: year, monthIndex: monthIndex, day: 1),
       c,
     );
-    // Group events by day-of-month for this (year, monthIndex).
+    // Group events by day-of-month for this (year, monthIndex). Multi-day
+    // events appear on every day in their range that intersects the
+    // currently-viewed month.
     final byDay = <int, List<Event>>{};
+    final monthFirst = engine.daysSinceEpoch(
+      engine.WorldDate(year: year, monthIndex: monthIndex, day: 1),
+      c,
+    );
+    final monthLast = monthFirst + daysInMonth - 1;
     for (final e in events) {
-      final d = e.startDate;
-      if (d.year == year && d.monthIndex == monthIndex) {
-        byDay.putIfAbsent(d.day, () => []).add(e);
+      final start = engine.daysSinceEpoch(e.startDate.toEngine(), c);
+      final end = e.endDate == null
+          ? start
+          : engine.daysSinceEpoch(e.endDate!.toEngine(), c);
+      // Intersect [start, end] with [monthFirst, monthLast].
+      final from = start < monthFirst ? monthFirst : start;
+      final to = end > monthLast ? monthLast : end;
+      if (from > to) continue; // doesn't touch this month
+      for (var d = from; d <= to; d++) {
+        final dayInMonth = d - monthFirst + 1;
+        byDay.putIfAbsent(dayInMonth, () => []).add(e);
       }
     }
     final cells = firstWeekday + daysInMonth;
