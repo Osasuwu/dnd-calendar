@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_providers.dart';
+import 'calendar_config_edit_screen.dart';
 import 'world_providers.dart';
 
 class WorldDetailScreen extends ConsumerWidget {
@@ -38,9 +39,28 @@ class WorldDetailScreen extends ConsumerWidget {
               else
                 Text('Role: player', style: Theme.of(context).textTheme.bodySmall),
               const Divider(height: 32),
-              Text(
-                'Calendar',
-                style: Theme.of(context).textTheme.titleMedium,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Calendar',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  if (isOwner)
+                    TextButton.icon(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CalendarConfigEditScreen(
+                            worldId: w.id,
+                            initial: w.calendar,
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Edit'),
+                    ),
+                ],
               ),
               const SizedBox(height: 8),
               _kv(context, 'Today', engine.formatDate(today, cal)),
