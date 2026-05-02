@@ -31,8 +31,29 @@ service cloud.firestore {
         && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if isOwner(worldId);
 
-      // Subcollections — open placeholders. Real rules land in S3/S4/S5/S6.
-      match /{document=**} {
+      // Events — read for any signed-in (S4 narrows to members + owner),
+      // write only by world owner. createdByUid must match auth.uid on
+      // create and stay immutable on update.
+      match /events/{eventId} {
+        allow read: if signedIn();
+        allow create: if isOwner(worldId)
+          && request.resource.data.createdByUid == request.auth.uid;
+        allow update: if isOwner(worldId)
+          && request.resource.data.createdByUid == resource.data.createdByUid;
+        allow delete: if isOwner(worldId);
+
+        // Registrations — placeholder until S6.
+        match /registrations/{regUid} {
+          allow read, write: if signedIn();
+        }
+      }
+
+      // Other subcollections (members, characters) — placeholders until
+      // S4/S5 land their real rules.
+      match /members/{memberUid} {
+        allow read, write: if signedIn();
+      }
+      match /characters/{charId} {
         allow read, write: if signedIn();
       }
     }
