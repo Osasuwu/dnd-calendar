@@ -67,10 +67,17 @@ service cloud.firestore {
         }
       }
 
-      // Characters — placeholder until S5.
+      // Characters — read for owner/members; write only by the character's
+      // own owner (uid field in the doc must match auth.uid). Owner of
+      // the world cannot edit other people's characters.
       match /characters/{charId} {
         allow read: if canSeeWorld(worldId);
-        allow write: if canSeeWorld(worldId);
+        allow create: if canSeeWorld(worldId)
+          && request.resource.data.uid == request.auth.uid;
+        allow update: if signedIn()
+          && resource.data.uid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid;
+        allow delete: if signedIn() && resource.data.uid == request.auth.uid;
       }
     }
 

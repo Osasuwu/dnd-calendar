@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_providers.dart';
 import 'calendar_config_edit_screen.dart';
+import 'characters_section.dart';
 import 'events_section.dart';
 import 'models/world.dart';
 import 'world_providers.dart';
@@ -34,7 +35,7 @@ class WorldDetailScreen extends ConsumerWidget {
         }
         final isOwner = me?.uid == w.ownerUid;
         return DefaultTabController(
-          length: 2,
+          length: 3,
           child: Scaffold(
             appBar: AppBar(
               title: Text(w.name),
@@ -42,6 +43,7 @@ class WorldDetailScreen extends ConsumerWidget {
                 tabs: [
                   Tab(icon: Icon(Icons.castle), text: 'Overview'),
                   Tab(icon: Icon(Icons.event), text: 'Events'),
+                  Tab(icon: Icon(Icons.people), text: 'Characters'),
                 ],
               ),
             ),
@@ -49,6 +51,7 @@ class WorldDetailScreen extends ConsumerWidget {
               children: [
                 _OverviewTab(world: w, isOwner: isOwner),
                 EventsSection(worldId: w.id, calendar: w.calendar),
+                CharactersSection(worldId: w.id),
               ],
             ),
           ),
