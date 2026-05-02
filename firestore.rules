@@ -60,10 +60,17 @@ service cloud.firestore {
           && request.resource.data.createdByUid == resource.data.createdByUid;
         allow delete: if isOwner(worldId);
 
-        // Registrations — placeholder until S6 lands character logic.
+        // Registrations — read for owner/members. Write only when the
+        // path uid matches auth.uid AND the requester is owner-or-member.
+        // Owner can also delete (e.g. removing a no-show).
         match /registrations/{regUid} {
           allow read: if canSeeWorld(worldId);
-          allow write: if signedIn() && regUid == request.auth.uid;
+          allow create: if canSeeWorld(worldId)
+            && regUid == request.auth.uid;
+          allow update: if canSeeWorld(worldId)
+            && regUid == request.auth.uid;
+          allow delete: if signedIn()
+            && (regUid == request.auth.uid || isOwner(worldId));
         }
       }
 
