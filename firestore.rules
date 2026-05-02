@@ -2,9 +2,14 @@ rules_version = '2';
 
 // Firestore security rules for dnd-calendar.
 //
-// MVP shape — kept loose where the membership system isn't built yet (S1).
-// S4 tightens the per-world read gate to "must be member or owner".
-// S3/S5/S6 add per-subcollection rules.
+// Top-level structure:
+//   worlds/{worldId}                 — world doc
+//   worlds/{w}/members/{uid}         — membership
+//   worlds/{w}/events/{eventId}
+//   worlds/{w}/events/{e}/registrations/{uid}
+//   worlds/{w}/characters/{charId}
+//   joinCodes/{code}                 — pointer doc { worldId, ownerUid }
+//                                      so non-members can resolve codes
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -18,44 +23,69 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/worlds/$(worldId)).data.ownerUid == request.auth.uid;
     }
 
-    match /worlds/{worldId} {
-      // Read: any authed user (S4 will narrow to members + owner).
-      allow read: if signedIn();
+    function isMember(worldId) {
+      return signedIn()
+          && exists(/databases/$(database)/documents/worlds/$(worldId)/members/$(request.auth.uid));
+    }
 
-      // Create: only as your own world; ownerUid must match auth.uid.
+    function canSeeWorld(worldId) {
+      return isOwner(worldId) || isMember(worldId);
+    }
+
+    match /worlds/{worldId} {
+      allow read: if canSeeWorld(worldId);
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid;
-
-      // Update / delete: only owner; ownerUid is immutable.
       allow update: if isOwner(worldId)
         && request.resource.data.ownerUid == resource.data.ownerUid;
       allow delete: if isOwner(worldId);
 
-      // Events — read for any signed-in (S4 narrows to members + owner),
-      // write only by world owner. createdByUid must match auth.uid on
-      // create and stay immutable on update.
+      // Members — self-join, owner can remove (post-MVP UI).
+      match /members/{memberUid} {
+        allow read: if canSeeWorld(worldId);
+        allow create: if signedIn()
+          && memberUid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid;
+        allow update: if signedIn() && memberUid == request.auth.uid;
+        allow delete: if isOwner(worldId)
+          || (signedIn() && memberUid == request.auth.uid);
+      }
+
+      // Events — read: owner or member; write: owner only.
       match /events/{eventId} {
-        allow read: if signedIn();
+        allow read: if canSeeWorld(worldId);
         allow create: if isOwner(worldId)
           && request.resource.data.createdByUid == request.auth.uid;
         allow update: if isOwner(worldId)
           && request.resource.data.createdByUid == resource.data.createdByUid;
         allow delete: if isOwner(worldId);
 
-        // Registrations — placeholder until S6.
+        // Registrations — placeholder until S6 lands character logic.
         match /registrations/{regUid} {
-          allow read, write: if signedIn();
+          allow read: if canSeeWorld(worldId);
+          allow write: if signedIn() && regUid == request.auth.uid;
         }
       }
 
-      // Other subcollections (members, characters) — placeholders until
-      // S4/S5 land their real rules.
-      match /members/{memberUid} {
-        allow read, write: if signedIn();
-      }
+      // Characters — placeholder until S5.
       match /characters/{charId} {
-        allow read, write: if signedIn();
+        allow read: if canSeeWorld(worldId);
+        allow write: if canSeeWorld(worldId);
       }
+    }
+
+    // Public-ish join-code lookup. Any signed-in user may read so the
+    // join flow can resolve a code → worldId without first being a member.
+    // Writes are restricted to the world's owner.
+    match /joinCodes/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn()
+        && resource.data.ownerUid == request.auth.uid;
     }
   }
 }
