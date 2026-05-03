@@ -1,0 +1,11 @@
+targets:
+  $default:
+    builders:
+      json_serializable:
+        options:
+          # Recurse into nested types when (de)serializing — required for our
+          # freezed-of-freezed shape (World.calendar, CalendarConfigData.months,
+          # CalendarConfigData.moons, CalendarConfigData.currentDate, etc.).
+          # Without this, the generated toJson dumps raw `_$XxxImpl` instances
+          # which Firestore rejects with "Invalid argument".
+          explicit_to_json: true

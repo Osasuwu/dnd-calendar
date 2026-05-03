@@ -202,7 +202,7 @@ class _CalendarConfigEditScreenState
           else
             TextButton(
               onPressed: _save,
-              child: const Text('Save', style: TextStyle(color: Colors.white)),
+              child: const Text('Save'),
             ),
         ],
       ),

@@ -48,3 +48,7 @@ package-lock.json
 # Firebase CLI scratch — flutterfire writes per-app firebase.json with
 # project + app IDs; root-level firebase.json is committed for rules deploy.
 apps/*/firebase.json
+
+# Local debug artifacts produced by `flutter run | tee`
+.flutter_run.log
+.flutter_run_input

@@ -33,7 +33,13 @@ service cloud.firestore {
     }
 
     match /worlds/{worldId} {
-      allow read: if canSeeWorld(worldId);
+      // Read uses the in-document `ownerUid` field directly so that
+      //   .where('ownerUid', isEqualTo: auth.uid)
+      // queries pass Firestore's static query-rule analysis. The
+      // alternative isMember(worldId) branch handles joined-as-player.
+      allow read: if signedIn()
+        && (resource.data.ownerUid == request.auth.uid
+            || isMember(worldId));
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid;
       allow update: if isOwner(worldId)
@@ -86,6 +92,28 @@ service cloud.firestore {
           && request.resource.data.uid == request.auth.uid;
         allow delete: if signedIn() && resource.data.uid == request.auth.uid;
       }
+    }
+
+    // Collection-group reads. The Flutter client uses two collectionGroup
+    // queries that cross world boundaries:
+    //   - watchJoinedWorldIds → collectionGroup('members').where(uid==me)
+    //   - register() overlap check → collectionGroup('registrations')
+    //                                .where(characterId==myCharacterId)
+    // Firestore's rules engine evaluates collectionGroup queries against
+    // top-level matches, so we add permissive read rules here. Writes are
+    // still funnelled through the per-world matches above.
+    match /{path=**}/members/{memberUid} {
+      // Match the field the collectionGroup query filters on
+      // (.where('uid', isEqualTo: auth.uid)) so Firestore's static
+      // query-rule analysis accepts it.
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+    match /{path=**}/registrations/{regUid} {
+      // Overlap check needs to read registrations across worlds for one
+      // characterId. Sign-in is the only gate — registration data is
+      // already denormalized (character name, owner display name) and
+      // not sensitive enough to warrant a tighter rule.
+      allow read: if signedIn();
     }
 
     // Public-ish join-code lookup. Any signed-in user may read so the
